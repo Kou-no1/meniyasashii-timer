@@ -96,6 +96,13 @@ button{cursor:pointer}
 @media (max-width:639px){.sign{flex:1 1 100%}.sign button{flex:1}.presets{flex-basis:100%;grid-template-columns:repeat(5,1fr)}.pre{padding:0 2px}}
 @media (min-width:640px){.presets{grid-template-columns:repeat(9,1fr)}}
 .actions{display:flex;gap:10px}
+@media (max-width:600px){.tab-like .lbl{display:none}.tab-like{width:52px;padding:0}}
+.blackout{position:fixed;inset:0;z-index:50;background:#000;cursor:none;display:flex;align-items:center;justify-content:center;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));user-select:none;-webkit-user-select:none}
+.bo-msg{text-align:center;color:#3a3a3a;display:flex;flex-direction:column;gap:.5em;transition:opacity 1.2s}
+.bo-title{font-size:clamp(1.2rem,3vw,2rem);font-weight:700;letter-spacing:.14em}
+.bo-sub{font-size:clamp(.95rem,2vw,1.3rem);letter-spacing:.1em}
+.blackout.quiet .bo-msg{opacity:.35}
 .credit{text-align:center;font-size:.8rem;color:var(--ink-2);letter-spacing:.08em;margin-top:-2px}
 .main{
   flex:3 1 0;min-height:clamp(50px,8vh,72px);font-size:clamp(1.25rem,2.2vw,1.8rem);font-weight:800;letter-spacing:.12em;
@@ -219,6 +226,7 @@ select{background:#000;border:2px solid var(--line);border-radius:var(--r);min-h
   <symbol id="i-screen" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
   <symbol id="i-key" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></symbol>
+  <symbol id="i-black" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="12" rx="1.5" fill="currentColor"/><path d="M8.5 20.5h7"/></symbol>
   <symbol id="i-prev" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
   <symbol id="i-next" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
   <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5"/><path d="M6 11H5v10h14V11h-1"/></symbol>
@@ -234,6 +242,7 @@ select{background:#000;border:2px solid var(--line);border-radius:var(--r);min-h
     </div>
     <div class="group">
       <button type="button" class="btn tog" id="btn-speak" aria-pressed="true" aria-label="Voice"><svg class="ic on"><use href="#i-speaker"/></svg><svg class="ic off"><use href="#i-mute"/></svg><span class="pill" id="speak-pill">ON</span></button>
+      <button type="button" class="btn tab-like" id="btn-black" aria-label="Black screen"><svg class="ic"><use href="#i-black"/></svg><span class="lbl">BLACK</span></button>
       <button type="button" class="btn sq" id="btn-help" aria-label="Help"><svg class="ic"><use href="#i-help"/></svg></button>
       <button type="button" class="btn sq" id="btn-settings" aria-haspopup="dialog" aria-label="Settings"><svg class="ic"><use href="#i-sliders"/></svg></button>
     </div>
@@ -265,6 +274,10 @@ select{background:#000;border:2px solid var(--line);border-radius:var(--r);min-h
     <button type="button" class="btn primary" id="btn-resume"><svg class="ic"><use href="#i-play"/></svg>RESUME</button>
     <button type="button" class="btn" id="btn-back"><svg class="ic"><use href="#i-back"/></svg>BACK</button>
   </div>
+</div>
+
+<div class="blackout" id="black" hidden>
+  <div class="bo-msg"><div class="bo-title">Black Screen Mode</div><div class="bo-sub">Tap to return</div></div>
 </div>
 
 <div class="scrim" id="scrim" hidden></div>
@@ -330,6 +343,7 @@ select{background:#000;border:2px solid var(--line);border-radius:var(--r);min-h
       <dt><kbd>Esc</kbd></dt><dd>Pause → Back</dd>
       <dt><kbd>C</kbd></dt><dd>Clear / Reset</dd>
       <dt><kbd>M</kbd></dt><dd>Voice on / off</dd>
+      <dt><kbd>Any key</kbd></dt><dd>Leave black screen</dd>
     </dl>
   </section>
 </aside>
@@ -930,6 +944,22 @@ $('#btn-install').addEventListener('click', doInstall);
 $('#btn-install-2').addEventListener('click', doInstall);
 if (standalone()) $('#install-how').hidden = true;
 
+/* ---------- black screen ---------- */
+let blackOn = false, blackT = 0;
+function openBlack(){
+  blackOn = true;
+  const b = $('#black'); b.classList.remove('quiet'); b.hidden = false;
+  if (S.full) enterFull();
+  syncWake();
+  clearTimeout(blackT); blackT = setTimeout(() => b.classList.add('quiet'), 4000);
+}
+function closeBlack(){
+  blackOn = false; clearTimeout(blackT);
+  $('#black').hidden = true;
+}
+$('#btn-black').addEventListener('click', openBlack);
+$('#black').addEventListener('click', closeBlack);
+
 /* ---------- wiring ---------- */
 const PRESETS = [30, 60, 120, 180, 300, 600, 1800, 2700, 3600];
 PRESETS.forEach(sec => {
@@ -967,6 +997,7 @@ document.addEventListener('pointerdown', () => { if (!unlocked) { unlocked = tru
 document.addEventListener('visibilitychange', () => { syncWake(); render(); });
 
 document.addEventListener('keydown', e => {
+  if (blackOn) { e.preventDefault(); closeBlack(); return; }
   if (guideOpen) { if (e.key === 'Escape') closeGuide(); return; }
   if (e.key === 'Escape' && panelOpen) { closePanel(); return; }
   if (panelOpen || e.ctrlKey || e.metaKey || e.altKey) return;
