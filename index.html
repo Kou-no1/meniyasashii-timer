@@ -1,0 +1,1024 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="description" content="Big 7-segment classroom timer and stopwatch">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Timer">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Class Timer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: a set-up screen (mode tabs, set time, preset keys, start) and a separate full-screen run view that shows nothing but heavy 7-segment digits. Pure black ground, white segments, icons and short English labels only. */
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  color-scheme:dark;
+  --bg:#000;
+  --ink:#fff;          /* digits only */
+  --chrome:#c2c2c2;     /* buttons, labels, blocks */
+  --chrome-press:#a3a3a3;
+  --ink-2:#8a8a8a;
+  --ghost:rgba(255,255,255,.07);
+  --ghost-2:rgba(255,255,255,.14);
+  --line:rgba(255,255,255,.3);
+  --press:rgba(255,255,255,.16);
+  --panel:#0c0c0c;
+  --r:8px;
+  --ui:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,"Hiragino Sans","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
+}
+html,body{height:100%}
+body{
+  background:var(--bg);color:var(--chrome);font-family:var(--ui);
+  padding-block:12px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  overflow-x:hidden;overflow-y:auto;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;
+}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--chrome);outline-offset:3px}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.ic{width:1.35em;height:1.35em;flex:none;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.ic.fill{fill:currentColor;stroke:none}
+
+/* ---------- set-up screen ---------- */
+#setup{min-height:100%;display:flex;flex-direction:column;gap:clamp(10px,2vh,22px)}
+.bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.group{display:flex;flex-wrap:wrap;gap:8px}
+.btn{
+  background:transparent;border:2px solid var(--line);border-radius:var(--r);
+  min-height:48px;padding:0 16px;font-size:clamp(1rem,1.4vw,1.2rem);font-weight:600;letter-spacing:.06em;
+  display:inline-flex;align-items:center;justify-content:center;gap:.5em;white-space:nowrap;
+}
+.btn.sq{width:52px;padding:0}
+@media (hover:hover){.btn:hover:not(:disabled){background:var(--press)}}
+.btn:disabled{opacity:.35;cursor:default}
+@media (max-width:600px){.tab .lbl{display:none}.tab{width:56px;padding:0}}
+.ampm{fill:var(--ink);font-family:var(--ui);font-weight:800}
+.tab[aria-selected="true"]{background:var(--chrome);color:#000;border-color:var(--chrome)}
+.tog .pill{font-weight:700;font-size:.8em;padding:.05em .5em;border-radius:4px;border:2px solid currentColor;min-width:3.2em;text-align:center}
+.tog[aria-pressed="true"] .pill{background:var(--chrome);color:#000;border-color:var(--chrome)}
+.tog[aria-pressed="false"]{color:var(--ink-2);border-style:dashed}
+.tog .off{display:none}
+.tog[aria-pressed="false"] .on{display:none}
+.tog[aria-pressed="false"] .off{display:block}
+
+.display{position:relative;flex:1 1 auto;min-height:110px}
+.display svg,.rdisplay svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.seg{fill:var(--ghost)}
+.seg.on,.dot{fill:var(--ink)}
+
+.controls{display:flex;flex-direction:column;gap:8px}
+.presetrow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+.sign{display:flex;border:2px solid var(--line);border-radius:var(--r);overflow:hidden;flex:none}
+.sign button{background:transparent;border:0;min-width:3.2rem;min-height:44px;font-size:clamp(1.4rem,2.2vw,1.9rem);line-height:1;font-weight:700}
+.sign button+button{border-left:2px solid var(--line)}
+.sign button[aria-pressed="true"]{background:var(--chrome);color:#000}
+.presets{flex:1 1 0;min-width:0;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pre{
+  background:transparent;border:2px solid var(--line);border-radius:var(--r);
+  min-height:clamp(44px,6.5vh,58px);font-size:clamp(1.05rem,1.7vw,1.45rem);font-weight:700;
+  font-variant-numeric:tabular-nums;padding:0 4px;
+}
+.pre .sg{font-weight:500;opacity:.7;margin-right:.06em}
+.pre small{font-size:.62em;font-weight:600;margin-left:.08em;opacity:.8}
+.presets[data-sign="minus"] .pre{border-style:dashed}
+@media (hover:hover){.pre:hover{background:var(--press)}}
+.pre:active{background:var(--chrome);color:#000}
+@media (max-width:639px){.sign{flex:1 1 100%}.sign button{flex:1}.presets{flex-basis:100%;grid-template-columns:repeat(5,1fr)}.pre{padding:0 2px}}
+@media (min-width:640px){.presets{grid-template-columns:repeat(9,1fr)}}
+.actions{display:flex;gap:10px}
+.credit{text-align:center;font-size:.8rem;color:var(--ink-2);letter-spacing:.08em;margin-top:-2px}
+.main{
+  flex:3 1 0;min-height:clamp(50px,8vh,72px);font-size:clamp(1.25rem,2.2vw,1.8rem);font-weight:800;letter-spacing:.12em;
+  background:var(--chrome);color:#000;border:2px solid var(--chrome);border-radius:var(--r);
+  display:inline-flex;align-items:center;justify-content:center;gap:.5em;
+}
+.main:active:not(:disabled){background:var(--chrome-press)}
+.main:disabled{opacity:.3;cursor:default}
+.clear{flex:1 1 0;min-height:clamp(50px,8vh,72px);font-size:clamp(1rem,1.6vw,1.3rem)}
+
+/* ---------- run view: digits only ---------- */
+.run{
+  position:fixed;inset:0;z-index:10;background:var(--bg);
+  display:flex;flex-direction:column;gap:2vmin;
+  padding:calc(3vmin + env(safe-area-inset-top,0px)) max(16px,3vmin,env(safe-area-inset-right,0px)) calc(3vmin + env(safe-area-inset-bottom,0px)) max(16px,3vmin,env(safe-area-inset-left,0px));
+  cursor:pointer;user-select:none;-webkit-user-select:none;
+}
+.run.going{cursor:none}
+.rdisplay{position:relative;flex:1 1 auto;min-height:0}
+.rdisplay svg{transform-origin:50% 50%;transition:opacity .25s}
+.run.paused .rdisplay svg{opacity:.3}
+.run.done .rdisplay svg{animation:pulse 2.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.8);opacity:.12}}
+@media (prefers-reduced-motion:reduce){
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.15}}
+  .rdisplay svg{transition:none}
+}
+.rprogress{flex:none;height:clamp(22px,5vh,56px);background:var(--ghost-2);border-radius:6px;overflow:hidden}
+#rbar{display:block;height:100%;width:0;background:var(--chrome);transition:width .12s linear}
+@media (prefers-reduced-motion:reduce){#rbar{transition:none}}
+.pausebar{
+  position:absolute;left:0;right:0;bottom:0;
+  display:flex;flex-wrap:wrap;justify-content:center;gap:12px;
+  padding:16px max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  cursor:default;
+}
+.pausebar .btn{background:var(--bg);min-height:64px;font-size:clamp(1.15rem,2vw,1.5rem);padding:0 28px}
+.pausebar .btn.primary{background:var(--chrome);color:#000;border-color:var(--chrome);font-weight:800}
+
+/* ---------- settings sheet ---------- */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:20}
+.panel{
+  position:fixed;top:0;bottom:0;right:0;width:min(440px,100%);z-index:21;overflow-y:auto;
+  background:var(--panel);border-left:1px solid var(--line);
+  padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(28px + env(safe-area-inset-bottom,0px)) 20px;
+}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+.panel h2{margin:0;font-size:1.3rem;letter-spacing:.14em;display:flex;align-items:center;gap:.5em}
+.grp{border-top:1px solid var(--line);padding-block:16px;display:flex;flex-direction:column;gap:12px}
+.grp h3{margin:0;font-size:.8rem;letter-spacing:.18em;color:var(--ink-2);font-weight:700;display:flex;align-items:center;gap:.5em}
+.grp h3 .ic{width:1.3em;height:1.3em}
+.row{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:44px;font-size:1.05rem}
+.row>span{min-width:0;display:flex;align-items:center;gap:.5em}
+.row input[type=checkbox]{width:24px;height:24px;accent-color:#c2c2c2;flex:none}
+.row input[type=range]{width:55%;accent-color:#c2c2c2}
+select{background:#000;border:2px solid var(--line);border-radius:var(--r);min-height:44px;padding:0 10px;max-width:62%;min-width:0}
+.sub{font-size:.95rem;color:var(--ink-2);display:flex;align-items:center;gap:.5em}
+.chips{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.chips.two{grid-template-columns:1fr 1fr}
+.chip{position:relative;display:block}
+.chip .face{display:flex;align-items:center;justify-content:center;min-height:46px;border:2px solid var(--line);border-radius:var(--r);cursor:pointer;font-weight:600;font-variant-numeric:tabular-nums}
+.chip input:checked+.face{background:var(--chrome);color:#000;border-color:var(--chrome);font-weight:800}
+.chip input:focus-visible+.face{outline:3px solid var(--chrome);outline-offset:3px}
+.note{margin:0;font-size:.85rem;line-height:1.6;color:var(--ink-2)}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;margin:0;font-size:.95rem;align-items:center}
+.keys dt kbd{display:inline-block;min-width:2.4em;text-align:center;border:2px solid var(--line);border-radius:6px;padding:.1em .45em;font:inherit;font-weight:700}
+.keys dd{margin:0;color:var(--ink-2)}
+
+/* ---------- first-launch guide ---------- */
+.guide-wrap{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;
+  padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.guide{width:min(640px,100%);max-height:100%;overflow-y:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:clamp(20px,4vw,36px);display:flex;flex-direction:column;gap:20px}
+.guide-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.guide-count{font-size:.9rem;letter-spacing:.18em;color:var(--ink-2);font-variant-numeric:tabular-nums;font-weight:600}
+.skip{background:none;border:0;color:var(--ink-2);min-height:44px;padding:0 4px;letter-spacing:.14em;font-weight:700;display:inline-flex;align-items:center;gap:.4em}
+.step{display:flex;flex-direction:column;align-items:center;gap:18px;min-height:17rem;text-align:center;justify-content:center}
+.step h2{margin:0;font-size:clamp(1.6rem,4vw,2.4rem);letter-spacing:.12em;line-height:1.2;display:flex;align-items:center;gap:.4em;font-weight:800}
+.step h2 .ic{width:1.1em;height:1.1em}
+.step p{margin:0;font-size:clamp(1.05rem,2vw,1.25rem);line-height:1.6;color:var(--ink-2);max-width:30em}
+.flow{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;font-size:clamp(1.1rem,2.2vw,1.4rem);font-weight:700;font-variant-numeric:tabular-nums}
+.k{display:inline-flex;align-items:center;justify-content:center;gap:.4em;min-height:46px;padding:0 14px;border:2px solid var(--line);border-radius:var(--r);white-space:nowrap}
+.k.w{background:var(--chrome);color:#000;border-color:var(--chrome)}
+.arrow{color:var(--ink-2)}
+.step .mini{position:relative;width:100%;height:clamp(70px,14vw,110px)}
+.step .mini svg{position:absolute;inset:0;width:100%;height:100%}
+.step .mini.blink svg{animation:pulse 2.6s ease-in-out infinite;transform-origin:50% 50%}
+.tapdot{width:72px;height:72px;position:relative}
+.tapdot::before,.tapdot::after{content:"";position:absolute;inset:0;margin:auto;border-radius:50%}
+.tapdot::before{width:22px;height:22px;background:var(--chrome)}
+.tapdot::after{border:3px solid var(--chrome);animation:ripple 1.8s ease-out infinite}
+@keyframes ripple{0%{transform:scale(.3);opacity:1}100%{transform:scale(1);opacity:0}}
+@media (prefers-reduced-motion:reduce){.tapdot::after{animation:none;opacity:.5}}
+.how{display:flex;flex-direction:column;gap:10px;width:100%;max-width:26em;text-align:left;font-size:1rem}
+.how div{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.how b{min-width:6.5em;letter-spacing:.06em}
+.dots{display:flex;gap:8px;justify-content:center}
+.dots i{width:9px;height:9px;border-radius:50%;background:var(--ghost-2)}
+.dots i.on{background:var(--chrome)}
+.guide-nav{display:flex;gap:10px}
+.guide-nav .btn{flex:1;min-height:58px;font-size:1.2rem}
+.guide-nav .btn.primary{flex:2;background:var(--chrome);color:#000;border-color:var(--chrome);font-weight:800;letter-spacing:.14em}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--chrome);color:#000;padding:10px 18px;border-radius:var(--r);z-index:40;max-width:calc(100% - 32px);text-align:center;font-weight:600}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M6 3h12M6 21h12M7 3v2.5a5 5 0 0 0 10 0V3M7 21v-2.5a5 5 0 0 1 10 0V21"/></symbol>
+  <symbol id="i-stopwatch" viewBox="0 0 24 24"><circle cx="12" cy="14" r="7"/><path d="M12 14v-3.5M10 3h4M12 3v4M18 8l1.6-1.6"/></symbol>
+  <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18.2 6.3a8 8 0 0 1 0 11.4"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.2 1-1.2 1.8v.4M12 16.8v.2"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3.5 8.5"/><path d="M3.5 3.5v5h5"/></symbol>
+  <symbol id="i-install" viewBox="0 0 24 24"><path d="M12 3v11M7.5 9.5L12 14l4.5-4.5M5 20h14"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-screen" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5"/><path d="M6 11H5v10h14V11h-1"/></symbol>
+  <symbol id="i-plusbox" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M12 8v8M8 12h8"/></symbol>
+</svg>
+
+<div id="setup">
+  <header class="bar">
+    <div class="group" role="tablist" aria-label="Mode">
+      <button type="button" class="btn tab" id="tab-timer" role="tab" aria-selected="true"><svg class="ic"><use href="#i-hourglass"/></svg><span class="lbl">TIMER</span></button>
+      <button type="button" class="btn tab" id="tab-sw" role="tab" aria-selected="false"><svg class="ic"><use href="#i-stopwatch"/></svg><span class="lbl">STOPWATCH</span></button>
+      <button type="button" class="btn tab" id="tab-clock" role="tab" aria-selected="false" aria-label="Clock"><svg class="ic"><use href="#i-clock"/></svg><span class="lbl">CLOCK</span></button>
+    </div>
+    <div class="group">
+      <button type="button" class="btn tog" id="btn-speak" aria-pressed="true" aria-label="Voice"><svg class="ic on"><use href="#i-speaker"/></svg><svg class="ic off"><use href="#i-mute"/></svg><span class="pill" id="speak-pill">ON</span></button>
+      <button type="button" class="btn sq" id="btn-help" aria-label="Help"><svg class="ic"><use href="#i-help"/></svg></button>
+      <button type="button" class="btn sq" id="btn-settings" aria-haspopup="dialog" aria-label="Settings"><svg class="ic"><use href="#i-sliders"/></svg></button>
+    </div>
+  </header>
+
+  <div class="display" aria-hidden="true"><svg id="seg-setup" viewBox="0 0 300 100" preserveAspectRatio="xMidYMid meet"></svg></div>
+  <span class="sr" id="sr-time" aria-live="off"></span>
+
+  <section class="controls">
+    <div class="presetrow" id="presetrow">
+      <div class="sign" role="group" aria-label="Add or subtract">
+        <button type="button" id="sign-plus" aria-pressed="true" aria-label="Add">+</button>
+        <button type="button" id="sign-minus" aria-pressed="false" aria-label="Subtract">−</button>
+      </div>
+      <div class="presets" id="presets"></div>
+    </div>
+    <div class="actions">
+      <button type="button" class="main" id="btn-start"><svg class="ic" id="start-ic"><use href="#i-play"/></svg><span id="start-label">START</span></button>
+      <button type="button" class="btn clear" id="btn-clear"><svg class="ic" id="clear-ic"><use href="#i-x"/></svg><span id="clear-label">CLEAR</span></button>
+    </div>
+  </section>
+  <footer class="credit">©2026 まなびたね</footer>
+</div>
+
+<div class="run" id="run" hidden>
+  <div class="rdisplay" aria-hidden="true"><svg id="seg-run" viewBox="0 0 300 100" preserveAspectRatio="xMidYMid meet"></svg></div>
+  <div class="rprogress" id="rprogress" hidden><i id="rbar"></i></div>
+  <div class="pausebar" id="pausebar" hidden>
+    <button type="button" class="btn primary" id="btn-resume"><svg class="ic"><use href="#i-play"/></svg>RESUME</button>
+    <button type="button" class="btn" id="btn-back"><svg class="ic"><use href="#i-back"/></svg>BACK</button>
+  </div>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="panel" id="panel" role="dialog" aria-modal="true" aria-labelledby="panel-title" hidden>
+  <div class="panel-head">
+    <h2 id="panel-title"><svg class="ic"><use href="#i-sliders"/></svg>SETTINGS</h2>
+    <button type="button" class="btn sq" id="panel-close" aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
+  </div>
+
+  <section class="grp">
+    <h3><svg class="ic"><use href="#i-speaker"/></svg>VOICE</h3>
+    <label class="row" for="opt-speak"><span>Voice on</span><input type="checkbox" id="opt-speak"></label>
+    <label class="row" for="opt-voice"><span>Voice</span><select id="opt-voice"></select></label>
+    <label class="row" for="opt-rate"><span>Speed <output id="rate-out"></output></span><input type="range" id="opt-rate" min="0.7" max="1.4" step="0.1"></label>
+    <div class="sub">Announce at</div>
+    <div class="chips" id="chips"></div>
+    <label class="row" for="opt-end"><span>Announce at 0:00</span><input type="checkbox" id="opt-end"></label>
+    <button type="button" class="btn" id="test-speak"><svg class="ic"><use href="#i-play"/></svg>TEST</button>
+    <p class="note" id="voice-note">Uses the Japanese voices on this device. Chrome may offer Google voices.</p>
+  </section>
+
+  <section class="grp">
+    <h3><svg class="ic"><use href="#i-bell"/></svg>ALARM</h3>
+    <label class="row" for="opt-sound"><span>Sound</span>
+      <select id="opt-sound">
+        <option value="bell">Bell</option>
+        <option value="chime">Chime</option>
+        <option value="beep">Beep</option>
+        <option value="buzzer">Buzzer</option>
+        <option value="none">Off</option>
+      </select>
+    </label>
+    <button type="button" class="btn" id="test-sound"><svg class="ic"><use href="#i-play"/></svg>TEST</button>
+    <label class="row" for="opt-volume"><span>Volume</span><input type="range" id="opt-volume" min="0" max="1" step="0.05"></label>
+  </section>
+
+  <section class="grp">
+    <h3><svg class="ic"><use href="#i-clock"/></svg>CLOCK</h3>
+    <div class="chips two" role="radiogroup" aria-label="Clock format">
+      <label class="chip"><input type="radio" class="sr" name="clockfmt" id="opt-24" value="24"><span class="face">24H</span></label>
+      <label class="chip"><input type="radio" class="sr" name="clockfmt" id="opt-12" value="12"><span class="face">12H AM/PM</span></label>
+    </div>
+    <label class="row" for="opt-sec"><span>Show seconds</span><input type="checkbox" id="opt-sec"></label>
+  </section>
+
+  <section class="grp">
+    <h3><svg class="ic"><use href="#i-screen"/></svg>DISPLAY</h3>
+    <label class="row" for="opt-full"><span>Full screen on start</span><input type="checkbox" id="opt-full"></label>
+    <label class="row" for="opt-bar"><span>Progress bar</span><input type="checkbox" id="opt-bar"></label>
+    <label class="row" for="opt-wake"><span>Keep screen on</span><input type="checkbox" id="opt-wake"></label>
+  </section>
+
+  <section class="grp" id="grp-install" hidden>
+    <h3><svg class="ic"><use href="#i-install"/></svg>INSTALL</h3>
+    <p class="note">Add to this device. Works offline.</p>
+    <button type="button" class="btn" id="btn-install-2"><svg class="ic"><use href="#i-install"/></svg>INSTALL</button>
+  </section>
+
+  <section class="grp">
+    <h3><svg class="ic"><use href="#i-key"/></svg>KEYS</h3>
+    <dl class="keys">
+      <dt><kbd>Space</kbd></dt><dd>Start / Pause / Resume</dd>
+      <dt><kbd>Esc</kbd></dt><dd>Pause → Back</dd>
+      <dt><kbd>C</kbd></dt><dd>Clear / Reset</dd>
+      <dt><kbd>M</kbd></dt><dd>Voice on / off</dd>
+    </dl>
+  </section>
+</aside>
+
+<div class="guide-wrap" id="guide" role="dialog" aria-modal="true" aria-label="How to use" hidden>
+  <div class="guide">
+    <div class="guide-top">
+      <span class="guide-count" id="guide-count"></span>
+      <button type="button" class="skip" id="guide-skip">SKIP<svg class="ic"><use href="#i-next"/></svg></button>
+    </div>
+    <div id="guide-steps">
+      <section class="step">
+        <h2><svg class="ic"><use href="#i-hourglass"/></svg>SET</h2>
+        <div class="flow"><span class="k">+1<small>m</small></span><span class="k">+1<small>m</small></span><span class="k">+30<small>s</small></span><span class="arrow">→</span><span class="k w">02:30</span></div>
+        <div class="flow"><span class="k w">+</span><span class="arrow">/</span><span class="k">−</span></div>
+      </section>
+      <section class="step" hidden>
+        <h2><svg class="ic"><use href="#i-play"/></svg>START</h2>
+        <div class="mini" aria-hidden="true"><svg id="seg-guide1" viewBox="0 0 300 100" preserveAspectRatio="xMidYMid meet"></svg></div>
+        <div class="flow"><svg class="ic"><use href="#i-screen"/></svg>FULL SCREEN</div>
+      </section>
+      <section class="step" hidden>
+        <h2>TAP = PAUSE</h2>
+        <div class="tapdot" aria-hidden="true"></div>
+        <div class="flow"><span class="k w"><svg class="ic"><use href="#i-play"/></svg>RESUME</span><span class="k"><svg class="ic"><use href="#i-back"/></svg>BACK</span></div>
+      </section>
+      <section class="step" hidden>
+        <h2><svg class="ic"><use href="#i-bell"/></svg>TIME UP</h2>
+        <div class="mini blink" aria-hidden="true"><svg id="seg-guide2" viewBox="0 0 300 100" preserveAspectRatio="xMidYMid meet"></svg></div>
+        <div class="flow"><span>TAP</span><span class="arrow">→</span><svg class="ic"><use href="#i-back"/></svg><span>SET</span></div>
+      </section>
+      <section class="step" hidden>
+        <h2><svg class="ic"><use href="#i-clock"/></svg>CLOCK</h2>
+        <div class="mini" aria-hidden="true"><svg id="seg-guide3" viewBox="0 0 300 100" preserveAspectRatio="xMidYMid meet"></svg></div>
+        <div class="flow"><span class="k"><svg class="ic"><use href="#i-sliders"/></svg></span><span class="arrow">→</span><span class="k w">24H</span><span class="k">12H AM/PM</span><span class="k w">:SS</span></div>
+      </section>
+      <section class="step" hidden>
+        <h2><svg class="ic"><use href="#i-speaker"/></svg>VOICE</h2>
+        <div class="flow"><span class="k"><svg class="ic"><use href="#i-sliders"/></svg></span><span class="arrow">→</span><span class="k w">5<small>m</small></span><span class="k w">1<small>m</small></span><span class="k">30<small>s</small></span><span class="k w">10<small>s</small></span></div>
+        <div class="flow"><span class="k"><svg class="ic"><use href="#i-speaker"/></svg>ON</span><span class="arrow">/</span><span class="k"><svg class="ic"><use href="#i-mute"/></svg>OFF</span></div>
+      </section>
+      <section class="step" hidden>
+        <h2><svg class="ic"><use href="#i-install"/></svg>INSTALL</h2>
+        <button type="button" class="btn" id="btn-install" hidden><svg class="ic"><use href="#i-install"/></svg>INSTALL</button>
+        <div class="how" id="install-how">
+          <div><b>Chrome</b><span class="arrow">→</span><span class="k"><svg class="ic"><use href="#i-install"/></svg>Install</span></div>
+          <div><b>iPad Safari</b><span class="arrow">→</span><span class="k"><svg class="ic"><use href="#i-share"/></svg></span><span class="arrow">→</span><span class="k"><svg class="ic"><use href="#i-plusbox"/></svg>Add to Home Screen</span></div>
+        </div>
+        <p>OFFLINE OK</p>
+      </section>
+    </div>
+    <div class="dots" id="guide-dots" aria-hidden="true"></div>
+    <div class="guide-nav">
+      <button type="button" class="btn" id="guide-prev" aria-label="Back"><svg class="ic"><use href="#i-prev"/></svg></button>
+      <button type="button" class="btn primary" id="guide-next"><span id="guide-next-label">NEXT</span><svg class="ic" id="guide-next-ic"><use href="#i-next"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(function(){
+'use strict';
+
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const pad = n => String(n).padStart(2, '0');
+
+/* ---------- settings ---------- */
+const KEY = 'classroom-timer-v1';
+const GUIDE_KEY = 'classroom-timer-guide-seen';
+const DEF = {speakOn:true, voice:'', rate:1, thresholds:[300,180,60,30,10], endSpeak:true, sound:'bell', volume:0.8, wake:true, full:true, bar:true, clock24:true, clockSec:true};
+let S = Object.assign({}, DEF);
+try {
+  const raw = localStorage.getItem(KEY);
+  if (raw) { const o = JSON.parse(raw); if (o && typeof o === 'object') S = Object.assign(S, o); }
+} catch (e) {}
+if (!Array.isArray(S.thresholds)) S.thresholds = DEF.thresholds.slice();
+S.thresholds = S.thresholds.filter(n => Number.isFinite(n)).sort((a, b) => b - a);
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+
+/* ---------- state ---------- */
+let mode = 'timer', view = 'setup', sign = 1, alarmOn = false, alarmTimer = 0;
+const T = {state:'idle', remain:0, total:0, endAt:0, last:0, armed:new Set()};
+const W = {state:'idle', base:0, startedAt:0};
+const MAXMS = 359999 * 1000;
+const now = () => performance.now();
+
+const timerRemain = t => T.state === 'running' ? Math.max(0, T.endAt - (t === undefined ? now() : t)) : T.remain;
+const swElapsed = t => W.state === 'running' ? W.base + ((t === undefined ? now() : t) - W.startedAt) : W.base;
+
+/* button / chip labels: 30s, 1m … */
+const short = sec => sec < 60 ? [sec, 's'] : [sec / 60, 'm'];
+/* spoken Japanese phrase (audio only) */
+function spanLabel(t){
+  if (t >= 3600 && t % 3600 === 0) return (t / 3600) + '時間';
+  if (t % 60 === 0) return (t / 60) + '分';
+  return t + '秒';
+}
+function fmtMain(s){
+  if (s >= 6000) return Math.floor(s / 3600) + ':' + pad(Math.floor(s % 3600 / 60)) + ':' + pad(s % 60);
+  return pad(Math.floor(s / 60)) + ':' + pad(s % 60);
+}
+function fmtClock(){
+  const d = new Date();
+  let h = d.getHours(), str, suf = '';
+  if (S.clock24) str = pad(h);
+  else { suf = h < 12 ? 'A' : 'P'; str = String(h % 12 || 12); }
+  str += ':' + pad(d.getMinutes());
+  if (S.clockSec) str += '|' + pad(d.getSeconds());
+  return str + suf;
+}
+const fmtTimer = ms => fmtMain(Math.ceil(ms / 1000));
+function fmtSw(ms){
+  const cs = Math.floor(ms / 10);
+  return fmtMain(Math.floor(cs / 100)) + '.' + pad(cs % 100);
+}
+
+/* ---------- 7-segment drawing ---------- */
+const SW = 56, SH = 100, TH = 10, GAP = 2, DG = 12, hh = TH / 2;
+const SEG = {'0':'abcdef','1':'bc','2':'abdeg','3':'abcdg','4':'bcfg','5':'acdfg','6':'acdefg','7':'abc','8':'abcdefg','9':'abcdfg'};
+const hx = (x0, x1, cy) => [[x0,cy],[x0+hh,cy-hh],[x1-hh,cy-hh],[x1,cy],[x1-hh,cy+hh],[x0+hh,cy+hh]];
+const vx = (cx, y0, y1) => [[cx,y0],[cx+hh,y0+hh],[cx+hh,y1-hh],[cx,y1],[cx-hh,y1-hh],[cx-hh,y0+hh]];
+const SEGP = {
+  a: hx(hh + GAP, SW - hh - GAP, hh),
+  g: hx(hh + GAP, SW - hh - GAP, SH / 2),
+  d: hx(hh + GAP, SW - hh - GAP, SH - hh),
+  f: vx(hh, hh + GAP, SH / 2 - GAP),
+  b: vx(SW - hh, hh + GAP, SH / 2 - GAP),
+  e: vx(hh, SH / 2 + GAP, SH - hh - GAP),
+  c: vx(SW - hh, SH / 2 + GAP, SH - hh - GAP)
+};
+const COLON = [32 - hh, 68 - hh];
+function Seg(svg){ this.svg = svg; this.digits = []; this.sig = ''; this.str = ''; }
+Seg.prototype.build = function(sig){
+  let x = 0, html = '', sub = false, lastAdv = 0;
+  for (const ch of sig) {
+    if (ch === 'd') {
+      const s = sub ? 0.5 : 1;
+      let polys = '';
+      for (const k in SEGP) polys += '<polygon class="seg" data-k="' + k + '" points="' + SEGP[k].map(p => p.join(',')).join(' ') + '"/>';
+      html += '<g transform="translate(' + x + ' ' + (SH - SH * s) + ') scale(' + s + ')">' + polys + '</g>';
+      x += (SW + DG) * s; lastAdv = DG * s;
+    } else if (ch === ':') {
+      html += '<rect class="dot" x="' + x + '" y="' + COLON[0] + '" width="' + TH + '" height="' + TH + '"/><rect class="dot" x="' + x + '" y="' + COLON[1] + '" width="' + TH + '" height="' + TH + '"/>';
+      x += TH + DG; lastAdv = DG;
+    } else if (ch === '|') {
+      const z = 0.5, oy = SH - SH * z;
+      COLON.forEach(cy => { html += '<rect class="dot" x="' + x + '" y="' + (oy + cy * z) + '" width="' + TH * z + '" height="' + TH * z + '"/>'; });
+      x += (TH + DG) * z; lastAdv = DG * z; sub = true;
+    } else if (ch === 'A' || ch === 'P') {
+      x += 6;
+      html += '<text class="ampm" x="' + x + '" y="40" font-size="40" textLength="64" lengthAdjust="spacingAndGlyphs">' + ch + 'M</text>';
+      x += 64 + DG; lastAdv = DG;
+    } else {
+      html += '<rect class="dot" x="' + x + '" y="' + (SH - TH) + '" width="' + TH + '" height="' + TH + '"/>';
+      x += TH + DG; lastAdv = DG; sub = true;
+    }
+  }
+  this.svg.setAttribute('viewBox', '0 0 ' + (x - lastAdv) + ' ' + SH);
+  this.svg.innerHTML = html;
+  this.digits = $$('g', this.svg).map(g => { const o = {}; $$('polygon', g).forEach(p => { o[p.dataset.k] = p; }); return o; });
+  this.sig = sig;
+};
+Seg.prototype.draw = function(str){
+  if (str === this.str) return;
+  const sig = str.replace(/\d/g, 'd');
+  if (sig !== this.sig) this.build(sig);
+  let di = 0;
+  for (const ch of str) {
+    if (ch >= '0' && ch <= '9') {
+      const on = SEG[ch], g = this.digits[di++];
+      for (const k in g) g[k].classList.toggle('on', on.indexOf(k) >= 0);
+    }
+  }
+  this.str = str;
+};
+const segSetup = new Seg($('#seg-setup'));
+const segRun = new Seg($('#seg-run'));
+new Seg($('#seg-guide1')).draw('04:59');
+new Seg($('#seg-guide2')).draw('00:00');
+new Seg($('#seg-guide3')).draw('10:42|05');
+
+/* ---------- audio: alarm ---------- */
+let actx = null, alarmBus = null;
+function audio(){
+  if (!actx) {
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+  }
+  if (actx.state === 'suspended') { try { actx.resume(); } catch (e) {} }
+  return actx;
+}
+function stopAlarm(){
+  clearTimeout(alarmTimer);
+  alarmOn = false;
+  if (alarmBus && actx) {
+    const b = alarmBus;
+    try { b.gain.cancelScheduledValues(0); b.gain.setTargetAtTime(0, actx.currentTime, 0.02); } catch (e) {}
+    setTimeout(() => { try { b.disconnect(); } catch (e) {} }, 250);
+  }
+  alarmBus = null;
+}
+function playAlarm(kind){
+  stopAlarm();
+  if (kind === 'none') return 0;
+  const ctx = audio();
+  if (!ctx) return 0;
+  const bus = ctx.createGain();
+  bus.gain.value = S.volume;
+  bus.connect(ctx.destination);
+  alarmBus = bus;
+  const t0 = ctx.currentTime + 0.05;
+  const tone = (t, f, d, type, v) => {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(v, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.connect(g); g.connect(bus);
+    o.start(t); o.stop(t + d + 0.05);
+  };
+  let end = 0;
+  if (kind === 'bell') {
+    for (let i = 0; i < 3; i++) { const t = t0 + i * 1.3; tone(t, 880, 1.2, 'sine', .5); tone(t, 1318, .9, 'sine', .18); tone(t, 2433, .5, 'sine', .1); }
+    end = 3.9;
+  } else if (kind === 'chime') {
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    for (let r = 0; r < 2; r++) notes.forEach((f, n) => { const t = t0 + r * 2.4 + n * .5; tone(t, f, 1.0, 'sine', .4); tone(t, f * 2, .5, 'sine', .1); });
+    end = 4.8;
+  } else if (kind === 'beep') {
+    for (let g = 0; g < 4; g++) for (let k = 0; k < 3; k++) tone(t0 + g * 1.0 + k * .22, 1760, .12, 'sine', .5);
+    end = 3.9;
+  } else {
+    for (let i = 0; i < 3; i++) { const t = t0 + i * 1.0; tone(t, 196, .7, 'sawtooth', .28); tone(t, 200, .7, 'square', .12); }
+    end = 3.2;
+  }
+  return end;
+}
+function startAlarm(){
+  const dur = playAlarm(S.sound);
+  if (dur > 0) {
+    alarmOn = true;
+    alarmTimer = setTimeout(() => { alarmOn = false; }, dur * 1000 + 200);
+  }
+}
+
+/* ---------- speech (spoken in Japanese) ---------- */
+let voices = [];
+const hasSpeech = 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance !== 'undefined';
+function currentVoice(){
+  return voices.find(v => v.name === S.voice) || voices.find(v => /google/i.test(v.name)) || voices[0] || null;
+}
+function speak(text){
+  if (!hasSpeech) return;
+  try {
+    if (speechSynthesis.speaking) speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    const v = currentVoice();
+    u.lang = v ? v.lang : 'ja-JP';
+    if (v) u.voice = v;
+    u.rate = S.rate; u.volume = S.volume;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+function fillVoices(){
+  if (!hasSpeech) return;
+  voices = speechSynthesis.getVoices().filter(v => /^ja/i.test(v.lang));
+  const sel = $('#opt-voice');
+  sel.innerHTML = '';
+  sel.add(new Option('Auto (Google first)', ''));
+  voices.forEach(v => sel.add(new Option(v.name, v.name)));
+  sel.value = voices.some(v => v.name === S.voice) ? S.voice : '';
+  $('#voice-note').textContent = voices.length
+    ? 'Uses the Japanese voices on this device. Chrome may offer Google voices.'
+    : 'No Japanese voice found on this device. Try another browser or device.';
+}
+function announce(t){ if (S.speakOn) speak('あと' + spanLabel(t) + 'です。'); }
+
+/* ---------- timer / stopwatch logic ---------- */
+function rearm(ms){
+  const rs = Math.ceil(ms / 1000);
+  T.armed = new Set(S.thresholds.filter(t => rs > t));
+}
+function adjust(sec){
+  if (T.state === 'running') return;
+  if (T.state === 'finished') { T.state = 'idle'; T.remain = 0; T.total = 0; }
+  let r = T.remain;
+  let delta = sec * 1000;
+  delta = delta > 0 ? Math.min(delta, MAXMS - r) : -Math.min(-delta, r);
+  r += delta;
+  T.remain = r;
+  T.total = Math.max(0, T.total + delta);
+  if (r <= 0) { T.state = 'idle'; T.total = 0; }
+  paintSetup(); render();
+}
+function startTimer(){
+  if (T.remain <= 0) return false;
+  if (T.total < T.remain) T.total = T.remain;
+  T.last = T.total;
+  T.endAt = now() + T.remain;
+  T.state = 'running';
+  rearm(T.remain);
+  return true;
+}
+function pauseTimer(){
+  if (T.state !== 'running') return;
+  T.remain = timerRemain();
+  T.state = 'paused';
+}
+function clearTimer(){
+  stopAlarm();
+  T.state = 'idle'; T.remain = 0; T.total = 0; T.armed.clear();
+}
+function finishTimer(){
+  T.state = 'finished'; T.remain = 0; T.armed.clear();
+  startAlarm();
+  if (S.speakOn && S.endSpeak) setTimeout(() => { if (T.state === 'finished') speak('時間です。'); }, S.sound === 'none' ? 0 : 900);
+  paintRun();
+}
+function loadLast(){
+  stopAlarm();
+  T.state = 'idle'; T.remain = T.last; T.total = T.last; T.armed.clear();
+}
+
+function startSw(){ if (W.state === 'running') return; W.startedAt = now(); W.state = 'running'; }
+function pauseSw(){ if (W.state !== 'running') return; W.base = swElapsed(); W.state = 'paused'; }
+function resetSw(){ W.state = 'idle'; W.base = 0; }
+
+function tick(){
+  const t = now();
+  if (T.state === 'running') {
+    const r = T.endAt - t;
+    if (r > 0) {
+      const rs = Math.ceil(r / 1000);
+      let hit = null;
+      T.armed.forEach(th => { if (rs <= th && (hit === null || th < hit)) hit = th; });
+      if (hit !== null) { Array.from(T.armed).forEach(th => { if (rs <= th) T.armed.delete(th); }); announce(hit); }
+    } else {
+      finishTimer();
+    }
+  }
+  render(t);
+}
+
+/* ---------- views ---------- */
+function showRun(){
+  view = 'run';
+  $('#run').hidden = false;
+  $('#setup').setAttribute('aria-hidden', 'true');
+  if (S.full) enterFull();
+  paintRun();
+  render();
+  syncWake();
+}
+function showSetup(){
+  view = 'setup';
+  $('#run').hidden = true;
+  $('#setup').removeAttribute('aria-hidden');
+  paintSetup();
+  render();
+}
+const curState = () => mode === 'timer' ? T.state : mode === 'sw' ? W.state : 'clock';
+function paintRun(){
+  const st = curState();
+  const run = $('#run');
+  run.classList.toggle('going', st === 'running');
+  run.classList.toggle('paused', st === 'paused');
+  run.classList.toggle('done', st === 'finished');
+  $('#pausebar').hidden = st !== 'paused';
+  $('#rprogress').hidden = !(S.bar && mode === 'timer');
+  if (st === 'paused') $('#btn-resume').focus({preventScroll:true});
+}
+function paintSetup(){
+  const isT = mode === 'timer', isC = mode === 'clock';
+  $('#btn-clear').hidden = isC;
+  $('#start-label').textContent = isC ? 'FULL SCREEN' : 'START';
+  $('#start-ic').firstElementChild.setAttribute('href', isC ? '#i-screen' : '#i-play');
+  if (isC) { $('#btn-start').disabled = false; return; }
+  $('#btn-start').disabled = isT ? T.remain <= 0 : false;
+  $('#clear-label').textContent = isT ? 'CLEAR' : 'RESET';
+  $('#clear-ic').firstElementChild.setAttribute('href', isT ? '#i-x' : '#i-reset');
+  $('#btn-clear').disabled = isT ? (T.remain <= 0 && T.state === 'idle') : W.base <= 0;
+}
+
+function start(){
+  audio();
+  if (mode === 'timer') { if (!startTimer()) return; }
+  else if (mode === 'sw') startSw();
+  showRun();
+}
+function runTap(){
+  if (mode === 'clock') { showSetup(); return; }
+  if (mode === 'timer') {
+    if (T.state === 'running') pauseTimer();
+    else if (T.state === 'paused') startTimer();
+    else if (T.state === 'finished') { loadLast(); showSetup(); return; }
+  } else {
+    if (W.state === 'running') pauseSw(); else startSw();
+  }
+  paintRun(); render();
+}
+function backToSetup(){
+  if (mode === 'timer') pauseTimer(); else if (mode === 'sw') pauseSw();
+  showSetup();
+}
+function clearMain(){
+  if (mode === 'clock') return;
+  if (mode === 'timer') clearTimer(); else resetSw();
+  paintSetup(); render();
+}
+function setMode(m){
+  mode = m;
+  $('#tab-timer').setAttribute('aria-selected', String(m === 'timer'));
+  $('#tab-sw').setAttribute('aria-selected', String(m === 'sw'));
+  $('#tab-clock').setAttribute('aria-selected', String(m === 'clock'));
+  $('#presetrow').hidden = m !== 'timer';
+  paintSetup(); render();
+}
+function setSign(s){
+  sign = s;
+  $('#sign-plus').setAttribute('aria-pressed', String(s > 0));
+  $('#sign-minus').setAttribute('aria-pressed', String(s < 0));
+  $('#presets').dataset.sign = s > 0 ? 'plus' : 'minus';
+  $$('.pre').forEach(b => {
+    const [n, u] = short(+b.dataset.sec);
+    b.firstChild.textContent = s > 0 ? '+' : '−';
+    b.setAttribute('aria-label', (s > 0 ? 'Add ' : 'Subtract ') + n + (u === 's' ? ' seconds' : ' minutes'));
+  });
+}
+function setSpeak(on){
+  S.speakOn = on; save();
+  $('#btn-speak').setAttribute('aria-pressed', String(on));
+  $('#speak-pill').textContent = on ? 'ON' : 'OFF';
+  $('#opt-speak').checked = on;
+  if (!on && hasSpeech) { try { speechSynthesis.cancel(); } catch (e) {} }
+}
+
+let lastPct = -1;
+function render(t){
+  const tt = t === undefined ? now() : t;
+  let str, pct = 0;
+  if (mode === 'timer') {
+    const r = timerRemain(tt);
+    str = fmtTimer(r);
+    pct = T.total > 0 ? Math.min(1, r / T.total) : 0;
+  } else if (mode === 'sw') {
+    str = fmtSw(swElapsed(tt));
+  } else {
+    str = fmtClock();
+  }
+  if (view === 'run') {
+    segRun.draw(str);
+    const p = Math.round(pct * 1000) / 10;
+    if (p !== lastPct) { $('#rbar').style.width = p + '%'; lastPct = p; }
+  } else {
+    segSetup.draw(str);
+  }
+  const sr = $('#sr-time');
+  const said = str.replace('|', ':').replace(/([AP])$/, ' $1M');
+  if (sr.textContent !== said) sr.textContent = said;
+}
+
+/* ---------- screen: fullscreen + wake lock ---------- */
+let wl = null, wlBusy = false;
+async function syncWake(){
+  if (wlBusy || !('wakeLock' in navigator)) return;
+  wlBusy = true;
+  try {
+    const want = S.wake && document.visibilityState === 'visible';
+    if (want && !wl) {
+      wl = await navigator.wakeLock.request('screen');
+      wl.addEventListener('release', () => { wl = null; });
+    } else if (!want && wl) {
+      await wl.release(); wl = null;
+    }
+  } catch (e) { wl = null; }
+  wlBusy = false;
+}
+const fsEl = document.documentElement;
+function inFull(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+function enterFull(){
+  if (inFull()) return;
+  try {
+    const fn = fsEl.requestFullscreen || fsEl.webkitRequestFullscreen;
+    if (!fn) return;
+    const p = fn.call(fsEl);
+    if (p && p.catch) p.catch(() => {});
+  } catch (e) {}
+}
+
+let toastTimer = 0;
+function toast(msg){
+  const el = $('#toast');
+  el.textContent = msg; el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 2600);
+}
+
+/* ---------- settings panel ---------- */
+let panelOpen = false;
+function openPanel(){
+  panelOpen = true;
+  $('#scrim').hidden = false; $('#panel').hidden = false;
+  $('#panel-close').focus();
+}
+function closePanel(){
+  panelOpen = false;
+  $('#scrim').hidden = true; $('#panel').hidden = true;
+  $('#btn-settings').focus();
+}
+const TH_LIST = [3600, 2700, 1800, 1200, 900, 600, 300, 180, 120, 60, 30, 10];
+function initSettings(){
+  const chips = $('#chips');
+  TH_LIST.forEach(sec => {
+    const [n, u] = short(sec);
+    const lab = document.createElement('label');
+    lab.className = 'chip';
+    lab.innerHTML = '<input type="checkbox" class="sr" value="' + sec + '"><span class="face">' + n + u + '</span>';
+    const inp = lab.firstChild;
+    inp.checked = S.thresholds.indexOf(sec) >= 0;
+    inp.addEventListener('change', () => {
+      S.thresholds = $$('input', chips).filter(i => i.checked).map(i => +i.value).sort((a, b) => b - a);
+      save();
+    });
+    chips.appendChild(lab);
+  });
+  const bind = (id, k, ev, get, after) => {
+    const el = $(id);
+    if (el.type === 'checkbox') el.checked = !!S[k]; else el.value = S[k];
+    el.addEventListener(ev, () => { S[k] = get(el); save(); if (after) after(); });
+  };
+  $('#opt-speak').checked = S.speakOn;
+  $('#opt-speak').addEventListener('change', e => setSpeak(e.target.checked));
+  bind('#opt-end', 'endSpeak', 'change', el => el.checked);
+  bind('#opt-rate', 'rate', 'input', el => +el.value, () => { $('#rate-out').textContent = '×' + S.rate.toFixed(1); });
+  $('#rate-out').textContent = '×' + Number(S.rate).toFixed(1);
+  $('#opt-voice').addEventListener('change', e => { S.voice = e.target.value; save(); });
+  bind('#opt-sound', 'sound', 'change', el => el.value);
+  bind('#opt-volume', 'volume', 'input', el => +el.value, () => { if (alarmBus) alarmBus.gain.value = S.volume; });
+  $('#opt-24').checked = !!S.clock24; $('#opt-12').checked = !S.clock24;
+  $$('input[name=clockfmt]').forEach(r => r.addEventListener('change', () => { S.clock24 = $('#opt-24').checked; save(); }));
+  bind('#opt-sec', 'clockSec', 'change', el => el.checked);
+  bind('#opt-full', 'full', 'change', el => el.checked);
+  bind('#opt-bar', 'bar', 'change', el => el.checked);
+  bind('#opt-wake', 'wake', 'change', el => el.checked, syncWake);
+  $('#test-speak').addEventListener('click', () => { audio(); speak('あと1分です。'); });
+  $('#test-sound').addEventListener('click', () => { audio(); const d = playAlarm(S.sound); if (d === 0 && S.sound !== 'none') toast('Sound is not available on this device'); });
+}
+
+/* ---------- first-launch guide ---------- */
+const steps = $$('#guide-steps .step');
+let gi = 0, guideOpen = false;
+steps.forEach(() => $('#guide-dots').appendChild(document.createElement('i')));
+function paintGuide(){
+  steps.forEach((s, i) => { s.hidden = i !== gi; });
+  $$('#guide-dots i').forEach((d, i) => d.classList.toggle('on', i === gi));
+  $('#guide-count').textContent = (gi + 1) + ' / ' + steps.length;
+  $('#guide-prev').disabled = gi === 0;
+  const last = gi === steps.length - 1;
+  $('#guide-next-label').textContent = last ? 'GO' : 'NEXT';
+  $('#guide-next-ic').firstElementChild.setAttribute('href', last ? '#i-play' : '#i-next');
+}
+function openGuide(){
+  gi = 0; guideOpen = true;
+  $('#guide').hidden = false;
+  paintGuide();
+  $('#guide-next').focus();
+}
+function closeGuide(){
+  guideOpen = false;
+  $('#guide').hidden = true;
+  try { localStorage.setItem(GUIDE_KEY, '1'); } catch (e) {}
+}
+$('#guide-next').addEventListener('click', () => { if (gi < steps.length - 1) { gi++; paintGuide(); } else closeGuide(); });
+$('#guide-prev').addEventListener('click', () => { if (gi > 0) { gi--; paintGuide(); } });
+$('#guide-skip').addEventListener('click', closeGuide);
+$('#btn-help').addEventListener('click', openGuide);
+
+/* ---------- install (PWA) ---------- */
+let deferredInstall = null;
+const mq = q => !!(window.matchMedia && window.matchMedia(q).matches);
+const standalone = () => mq('(display-mode: standalone)') || mq('(display-mode: fullscreen)') || navigator.standalone === true;
+function paintInstall(){
+  const can = !!deferredInstall && !standalone();
+  $('#btn-install').hidden = !can;
+  $('#grp-install').hidden = !can;
+}
+async function doInstall(){
+  if (!deferredInstall) return;
+  const ev = deferredInstall; deferredInstall = null;
+  try { ev.prompt(); const r = await ev.userChoice; if (r && r.outcome === 'accepted') toast('Installed'); } catch (e) {}
+  paintInstall();
+}
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; paintInstall(); });
+window.addEventListener('appinstalled', () => { deferredInstall = null; paintInstall(); });
+$('#btn-install').addEventListener('click', doInstall);
+$('#btn-install-2').addEventListener('click', doInstall);
+if (standalone()) $('#install-how').hidden = true;
+
+/* ---------- wiring ---------- */
+const PRESETS = [30, 60, 120, 180, 300, 600, 1800, 2700, 3600];
+PRESETS.forEach(sec => {
+  const [n, u] = short(sec);
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'pre'; b.dataset.sec = sec;
+  b.innerHTML = '<span class="sg"></span>' + n + '<small>' + u + '</small>';
+  $('#presets').appendChild(b);
+});
+$('#presets').addEventListener('click', e => {
+  const b = e.target.closest('.pre');
+  if (b) adjust(sign * +b.dataset.sec);
+});
+$('#sign-plus').addEventListener('click', () => setSign(1));
+$('#sign-minus').addEventListener('click', () => setSign(-1));
+$('#tab-timer').addEventListener('click', () => setMode('timer'));
+$('#tab-sw').addEventListener('click', () => setMode('sw'));
+$('#tab-clock').addEventListener('click', () => setMode('clock'));
+$('#btn-start').addEventListener('click', start);
+$('#btn-clear').addEventListener('click', clearMain);
+$('#run').addEventListener('click', e => { if (!e.target.closest('.pausebar')) runTap(); });
+$('#btn-resume').addEventListener('click', runTap);
+$('#btn-back').addEventListener('click', backToSetup);
+$('#btn-speak').addEventListener('click', () => setSpeak(!S.speakOn));
+$('#btn-settings').addEventListener('click', openPanel);
+$('#panel-close').addEventListener('click', closePanel);
+$('#scrim').addEventListener('click', closePanel);
+
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button');
+  if (b && e.detail > 0 && !panelOpen && !guideOpen && !b.closest('.pausebar')) b.blur();
+});
+let unlocked = false;
+document.addEventListener('pointerdown', () => { if (!unlocked) { unlocked = true; audio(); syncWake(); } }, {passive:true});
+document.addEventListener('visibilitychange', () => { syncWake(); render(); });
+
+document.addEventListener('keydown', e => {
+  if (guideOpen) { if (e.key === 'Escape') closeGuide(); return; }
+  if (e.key === 'Escape' && panelOpen) { closePanel(); return; }
+  if (panelOpen || e.ctrlKey || e.metaKey || e.altKey) return;
+  const tag = e.target && e.target.tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+  if (tag === 'BUTTON' && (e.key === 'Enter' || e.key === ' ')) return;
+  const k = e.key.toLowerCase();
+  if (view === 'run') {
+    if (e.code === 'Space' || e.key === 'Enter') { e.preventDefault(); runTap(); }
+    else if (e.key === 'Escape') {
+      if (curState() === 'paused') backToSetup(); else runTap();
+    }
+    else if (k === 'm') setSpeak(!S.speakOn);
+  } else {
+    if (e.code === 'Space') { e.preventDefault(); start(); }
+    else if (k === 'c') clearMain();
+    else if (k === 'm') setSpeak(!S.speakOn);
+  }
+});
+
+/* ---------- ticker (worker keeps time when the tab is in the background) ---------- */
+let fallback = setInterval(tick, 100);
+try {
+  const blob = new Blob(['setInterval(function(){postMessage(0)},50)'], {type:'text/javascript'});
+  const w = new Worker(URL.createObjectURL(blob));
+  w.onmessage = () => { if (fallback) { clearInterval(fallback); fallback = 0; } tick(); };
+  w.onerror = () => { try { w.terminate(); } catch (e) {} if (!fallback) fallback = setInterval(tick, 100); };
+} catch (e) {}
+
+/* ---------- offline support when hosted as a PWA ---------- */
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && document.querySelector('link[rel="manifest"]')) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
+}
+
+/* ---------- init ---------- */
+initSettings();
+setSign(1);
+setSpeak(S.speakOn);
+if (hasSpeech) {
+  fillVoices();
+  try { speechSynthesis.onvoiceschanged = fillVoices; } catch (e) {}
+} else {
+  $('#voice-note').textContent = 'Voice is not supported in this browser.';
+}
+paintSetup();
+render();
+syncWake();
+let seen = false;
+try { seen = localStorage.getItem(GUIDE_KEY) === '1'; } catch (e) {}
+if (!seen) openGuide();
+})();
+</script>
+
+</body>
+</html>
