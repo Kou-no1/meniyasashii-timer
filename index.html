@@ -24,7 +24,7 @@
   --ink:#fff;          /* digits only */
   --chrome:#c2c2c2;     /* buttons, labels, blocks */
   --chrome-press:#a3a3a3;
-  --pie:#e0463c;
+  --pie:#f2f2f2;
   --ink-2:#8a8a8a;
   --ghost:rgba(255,255,255,.07);
   --ghost-2:rgba(255,255,255,.14);
@@ -131,7 +131,6 @@ button{cursor:pointer}
 .run.warn .rstage svg{animation:breathe 2.4s ease-in-out infinite}
 @keyframes breathe{0%,100%{opacity:1}50%{opacity:.5}}
 .pie-face{fill:var(--ghost)}
-.pie-tick{stroke:var(--line);stroke-width:2.5;stroke-linecap:round}
 .pie-fill{fill:var(--pie)}
 .pie-hub{fill:var(--chrome)}
 .hold-hint{position:absolute;left:0;right:0;top:calc(20px + env(safe-area-inset-top,0px));text-align:center;color:var(--ink-2);font-size:clamp(1rem,2vw,1.4rem);font-weight:700;letter-spacing:.16em;pointer-events:none;opacity:0;transition:opacity .4s}
@@ -144,9 +143,6 @@ button{cursor:pointer}
   .run.warn .rstage svg{animation:none;opacity:.7}
   .rstage svg{transition:none}
 }
-.rprogress{flex:none;height:clamp(22px,5vh,56px);background:var(--ghost-2);border-radius:6px;overflow:hidden}
-#rbar{display:block;height:100%;width:0;background:var(--chrome);transition:width .12s linear}
-@media (prefers-reduced-motion:reduce){#rbar{transition:none}}
 .pausebar{
   position:absolute;left:0;right:0;bottom:0;
   display:flex;flex-wrap:wrap;justify-content:center;gap:12px;
@@ -292,7 +288,6 @@ select{background:#000;border:2px solid var(--line);border-radius:var(--r);min-h
     <div class="rpie" id="rpie" hidden>
       <svg viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet">
         <circle class="pie-face" cx="100" cy="100" r="96"/>
-        <g id="pie-ticks"></g>
         <circle class="pie-fill" id="pie-full" cx="100" cy="100" r="88" hidden/>
         <path class="pie-fill" id="pie-path" d=""/>
         <circle class="pie-hub" cx="100" cy="100" r="7"/>
@@ -302,7 +297,6 @@ select{background:#000;border:2px solid var(--line);border-radius:var(--r);min-h
   </div>
   <div class="hold-hint" id="hold-hint"></div>
   <div class="hold-ring" id="hold-ring"></div>
-  <div class="rprogress" id="rprogress" hidden><i id="rbar"></i></div>
   <div class="pausebar" id="pausebar" hidden>
     <button type="button" class="btn primary" id="btn-resume"><svg class="ic"><use href="#i-play"/></svg>RESUME</button>
     <button type="button" class="btn" id="btn-back"><svg class="ic"><use href="#i-back"/></svg>BACK</button>
@@ -390,11 +384,10 @@ select{background:#000;border:2px solid var(--line);border-radius:var(--r);min-h
     </div>
     <div class="sub">Pie color</div>
     <div class="chips two" role="radiogroup" aria-label="Pie color">
-      <label class="chip"><input type="radio" class="sr" name="pie" value="red"><span class="face">Red</span></label>
       <label class="chip"><input type="radio" class="sr" name="pie" value="white"><span class="face">White</span></label>
+      <label class="chip"><input type="radio" class="sr" name="pie" value="red"><span class="face">Red</span></label>
     </div>
     <label class="row" for="opt-full"><span>Full screen on start</span><input type="checkbox" id="opt-full"></label>
-    <label class="row" for="opt-bar"><span>Progress bar</span><input type="checkbox" id="opt-bar"></label>
     <label class="row" for="opt-wake"><span>Keep screen on</span><input type="checkbox" id="opt-wake"></label>
   </section>
 
@@ -484,7 +477,7 @@ const pad = n => String(n).padStart(2, '0');
 /* ---------- settings ---------- */
 const KEY = 'classroom-timer-v1';
 const GUIDE_KEY = 'classroom-timer-guide-seen';
-const DEF = {speakOn:false, voice:'', rate:1, thresholds:[300,180,60,30,10], endSpeak:true, sound:'bell', volume:0.8, wake:true, full:true, bar:true, clock24:true, clockSec:true, viewMode:'both', pieColor:'red', warn:60, endFx:'pulse', over:true, lock:false, fade:true};
+const DEF = {speakOn:false, voice:'', rate:1, thresholds:[300,180,60,30,10], endSpeak:true, sound:'bell', volume:0.8, wake:true, full:true, bar:true, clock24:true, clockSec:true, viewMode:'both', pieColor:'white', warn:60, endFx:'pulse', over:true, lock:false, fade:true};
 let S = Object.assign({}, DEF);
 try {
   const raw = localStorage.getItem(KEY);
@@ -786,12 +779,11 @@ function paintRun(){
   run.classList.toggle('paused', st === 'paused');
   run.classList.toggle('done', st === 'finished');
   $('#pausebar').hidden = st !== 'paused';
-  $('#rprogress').hidden = !(S.bar && mode === 'timer');
   if (mode !== 'timer') run.classList.remove('pulse', 'calm', 'warn');
   const vm = mode === 'timer' ? S.viewMode : 'digits';
   $('#rpie').hidden = vm === 'digits';
   $('#rdigits').hidden = vm === 'pie';
-  document.documentElement.style.setProperty('--pie', S.pieColor === 'white' ? '#e6e6e6' : '#e0463c');
+  document.documentElement.style.setProperty('--pie', S.pieColor === 'red' ? '#e0463c' : '#f2f2f2');
   if (st === 'paused') $('#btn-resume').focus({preventScroll:true});
 }
 function paintSetup(){
@@ -860,14 +852,6 @@ function setSpeak(on){
 }
 
 /* ---------- pie ---------- */
-(function(){
-  let h = '';
-  for (let i = 0; i < 12; i++) {
-    const a = i * Math.PI / 6, r1 = i % 3 ? 90 : 84;
-    h += '<line class="pie-tick" x1="' + (100 + r1 * Math.sin(a)).toFixed(1) + '" y1="' + (100 - r1 * Math.cos(a)).toFixed(1) + '" x2="' + (100 + 95 * Math.sin(a)).toFixed(1) + '" y2="' + (100 - 95 * Math.cos(a)).toFixed(1) + '"/>';
-  }
-  $('#pie-ticks').innerHTML = h;
-})();
 let lastPie = -1;
 function drawPie(f){
   const q = Math.round(f * 2000) / 2000;
@@ -908,8 +892,6 @@ function render(t){
   }
   if (view === 'run') {
     segRun.draw(str);
-    const p = Math.round(pct * 1000) / 10;
-    if (p !== lastPct) { $('#rbar').style.width = p + '%'; lastPct = p; }
   } else {
     segSetup.draw(str);
   }
@@ -1012,7 +994,6 @@ function initSettings(){
   bind('#opt-lock', 'lock', 'change', el => el.checked);
   bind('#opt-fade', 'fade', 'change', el => el.checked);
   bind('#opt-full', 'full', 'change', el => el.checked);
-  bind('#opt-bar', 'bar', 'change', el => el.checked);
   bind('#opt-wake', 'wake', 'change', el => el.checked, syncWake);
   $('#test-speak').addEventListener('click', () => { audio(); speak('あと1分です。'); });
   $('#test-sound').addEventListener('click', () => { audio(); const d = playAlarm(S.sound); if (d === 0 && S.sound !== 'none') toast('Sound is not available on this device'); });

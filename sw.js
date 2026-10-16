@@ -1,5 +1,5 @@
 /* Class Timer service worker: cache the app shell so it opens offline. */
-const CACHE = 'class-timer-v10';
+const CACHE = 'class-timer-v11';
 const ASSETS = [
   './',
   './index.html',
