@@ -61,7 +61,6 @@ button{cursor:pointer}
 .btn.sq{width:52px;padding:0}
 @media (hover:hover){.btn:hover:not(:disabled){background:var(--press)}}
 .btn:disabled{opacity:.35;cursor:default}
-@media (max-width:600px){.tab .lbl{display:none}.tab{width:56px;padding:0}}
 .ampm{fill:var(--ink);font-family:var(--ui);font-weight:800}
 .tab[aria-selected="true"]{background:var(--chrome);color:#000;border-color:var(--chrome)}
 .tog .pill{font-weight:700;font-size:.8em;padding:.05em .5em;border-radius:4px;border:2px solid currentColor;min-width:3.2em;text-align:center}
@@ -96,7 +95,6 @@ button{cursor:pointer}
 @media (max-width:639px){.sign{flex:1 1 100%}.sign button{flex:1}.presets{flex-basis:100%;grid-template-columns:repeat(5,1fr)}.pre{padding:0 2px}}
 @media (min-width:640px){.presets{grid-template-columns:repeat(9,1fr)}}
 .actions{display:flex;gap:10px}
-@media (max-width:600px){.tab-like .lbl{display:none}.tab-like{width:52px;padding:0}}
 .blackout{position:fixed;inset:0;z-index:50;background:#000;cursor:none;display:flex;align-items:center;justify-content:center;
   padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));user-select:none;-webkit-user-select:none}
 .bo-msg{text-align:center;color:#3a3a3a;display:flex;flex-direction:column;gap:.5em;transition:opacity 1.2s}
@@ -235,14 +233,18 @@ select{background:#000;border:2px solid var(--line);border-radius:var(--r);min-h
 
 <div id="setup">
   <header class="bar">
+    <div class="group">
     <div class="group" role="tablist" aria-label="Mode">
-      <button type="button" class="btn tab" id="tab-timer" role="tab" aria-selected="true"><svg class="ic"><use href="#i-hourglass"/></svg><span class="lbl">TIMER</span></button>
-      <button type="button" class="btn tab" id="tab-sw" role="tab" aria-selected="false"><svg class="ic"><use href="#i-stopwatch"/></svg><span class="lbl">STOPWATCH</span></button>
-      <button type="button" class="btn tab" id="tab-clock" role="tab" aria-selected="false" aria-label="Clock"><svg class="ic"><use href="#i-clock"/></svg><span class="lbl">CLOCK</span></button>
+      <button type="button" class="btn sq tab" id="tab-timer" role="tab" aria-selected="true" aria-label="Timer" title="Timer"><svg class="ic"><use href="#i-hourglass"/></svg></button>
+      <button type="button" class="btn sq tab" id="tab-sw" role="tab" aria-selected="false" aria-label="Stopwatch" title="Stopwatch"><svg class="ic"><use href="#i-stopwatch"/></svg></button>
+      <button type="button" class="btn sq tab" id="tab-clock" role="tab" aria-selected="false" aria-label="Clock" title="Clock"><svg class="ic"><use href="#i-clock"/></svg></button>
     </div>
     <div class="group">
-      <button type="button" class="btn tog" id="btn-speak" aria-pressed="true" aria-label="Voice"><svg class="ic on"><use href="#i-speaker"/></svg><svg class="ic off"><use href="#i-mute"/></svg><span class="pill" id="speak-pill">ON</span></button>
-      <button type="button" class="btn tab-like" id="btn-black" aria-label="Black screen"><svg class="ic"><use href="#i-black"/></svg><span class="lbl">BLACK</span></button>
+      <button type="button" class="btn sq" id="btn-black" aria-label="Black screen" title="Black screen"><svg class="ic"><use href="#i-black"/></svg></button>
+    </div>
+    </div>
+    <div class="group">
+      <button type="button" class="btn tog" id="btn-speak" aria-pressed="false" aria-label="Voice"><svg class="ic on"><use href="#i-speaker"/></svg><svg class="ic off"><use href="#i-mute"/></svg><span class="pill" id="speak-pill">OFF</span></button>
       <button type="button" class="btn sq" id="btn-help" aria-label="Help"><svg class="ic"><use href="#i-help"/></svg></button>
       <button type="button" class="btn sq" id="btn-settings" aria-haspopup="dialog" aria-label="Settings"><svg class="ic"><use href="#i-sliders"/></svg></button>
     </div>
@@ -416,7 +418,7 @@ const pad = n => String(n).padStart(2, '0');
 /* ---------- settings ---------- */
 const KEY = 'classroom-timer-v1';
 const GUIDE_KEY = 'classroom-timer-guide-seen';
-const DEF = {speakOn:true, voice:'', rate:1, thresholds:[300,180,60,30,10], endSpeak:true, sound:'bell', volume:0.8, wake:true, full:true, bar:true, clock24:true, clockSec:true};
+const DEF = {speakOn:false, voice:'', rate:1, thresholds:[300,180,60,30,10], endSpeak:true, sound:'bell', volume:0.8, wake:true, full:true, bar:true, clock24:true, clockSec:true};
 let S = Object.assign({}, DEF);
 try {
   const raw = localStorage.getItem(KEY);
