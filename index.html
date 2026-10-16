@@ -24,6 +24,7 @@
   --ink:#fff;          /* digits only */
   --chrome:#c2c2c2;     /* buttons, labels, blocks */
   --chrome-press:#a3a3a3;
+  --pie:#e0463c;
   --ink-2:#8a8a8a;
   --ghost:rgba(255,255,255,.07);
   --ghost-2:rgba(255,255,255,.14);
@@ -71,7 +72,7 @@ button{cursor:pointer}
 .tog[aria-pressed="false"] .off{display:block}
 
 .display{position:relative;flex:1 1 auto;min-height:110px}
-.display svg,.rdisplay svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.display svg,.rdisplay svg,.rpie svg{position:absolute;inset:0;width:100%;height:100%;display:block}
 .seg{fill:var(--ghost)}
 .seg.on,.dot{fill:var(--ink)}
 
@@ -119,14 +120,29 @@ button{cursor:pointer}
   cursor:pointer;user-select:none;-webkit-user-select:none;
 }
 .run.going{cursor:none}
-.rdisplay{position:relative;flex:1 1 auto;min-height:0}
-.rdisplay svg{transform-origin:50% 50%;transition:opacity .25s}
-.run.paused .rdisplay svg{opacity:.3}
-.run.done .rdisplay svg{animation:pulse 2.6s ease-in-out infinite}
+.rstage{position:relative;flex:1 1 auto;min-height:0;display:flex;gap:4vmin}
+.rdisplay{position:relative;flex:1.5 1 0;min-width:0;min-height:0}
+.rpie{position:relative;flex:1 1 0;min-width:0;min-height:0}
+@media (orientation:portrait){.rstage{flex-direction:column}}
+.rstage svg{transform-origin:50% 50%;transition:opacity .25s}
+.run.paused .rstage svg{opacity:.3}
+.run.done.pulse .rstage svg{animation:pulse 2.6s ease-in-out infinite}
+.run.done.calm .rstage svg{opacity:.4;transition:opacity 3s ease}
+.run.warn .rstage svg{animation:breathe 2.4s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.5}}
+.pie-face{fill:var(--ghost)}
+.pie-tick{stroke:var(--line);stroke-width:2.5;stroke-linecap:round}
+.pie-fill{fill:var(--pie)}
+.pie-hub{fill:var(--chrome)}
+.hold-hint{position:absolute;left:0;right:0;top:calc(20px + env(safe-area-inset-top,0px));text-align:center;color:var(--ink-2);font-size:clamp(1rem,2vw,1.4rem);font-weight:700;letter-spacing:.16em;pointer-events:none;opacity:0;transition:opacity .4s}
+.hold-hint.show{opacity:1}
+.hold-ring{position:absolute;width:84px;height:84px;margin:-42px 0 0 -42px;border-radius:50%;border:4px solid var(--chrome);pointer-events:none;opacity:0;transform:scale(.4)}
+.hold-ring.on{opacity:.8;transform:scale(1);transition:transform var(--hold,700ms) linear,opacity .15s}
 @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.8);opacity:.12}}
 @media (prefers-reduced-motion:reduce){
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.15}}
-  .rdisplay svg{transition:none}
+  .run.warn .rstage svg{animation:none;opacity:.7}
+  .rstage svg{transition:none}
 }
 .rprogress{flex:none;height:clamp(22px,5vh,56px);background:var(--ghost-2);border-radius:6px;overflow:hidden}
 #rbar{display:block;height:100%;width:0;background:var(--chrome);transition:width .12s linear}
@@ -160,6 +176,8 @@ select{background:#000;border:2px solid var(--line);border-radius:var(--r);min-h
 .sub{font-size:.95rem;color:var(--ink-2);display:flex;align-items:center;gap:.5em}
 .chips{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .chips.two{grid-template-columns:1fr 1fr}
+.chips.three{grid-template-columns:repeat(3,1fr)}
+.chips.four{grid-template-columns:repeat(4,1fr)}
 .chip{position:relative;display:block}
 .chip .face{display:flex;align-items:center;justify-content:center;min-height:46px;border:2px solid var(--line);border-radius:var(--r);cursor:pointer;font-weight:600;font-variant-numeric:tabular-nums}
 .chip input:checked+.face{background:var(--chrome);color:#000;border-color:var(--chrome);font-weight:800}
@@ -270,7 +288,20 @@ select{background:#000;border:2px solid var(--line);border-radius:var(--r);min-h
 </div>
 
 <div class="run" id="run" hidden>
-  <div class="rdisplay" aria-hidden="true"><svg id="seg-run" viewBox="0 0 300 100" preserveAspectRatio="xMidYMid meet"></svg></div>
+  <div class="rstage" aria-hidden="true">
+    <div class="rpie" id="rpie" hidden>
+      <svg viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet">
+        <circle class="pie-face" cx="100" cy="100" r="96"/>
+        <g id="pie-ticks"></g>
+        <circle class="pie-fill" id="pie-full" cx="100" cy="100" r="88" hidden/>
+        <path class="pie-fill" id="pie-path" d=""/>
+        <circle class="pie-hub" cx="100" cy="100" r="7"/>
+      </svg>
+    </div>
+    <div class="rdisplay" id="rdigits"><svg id="seg-run" viewBox="0 0 300 100" preserveAspectRatio="xMidYMid meet"></svg></div>
+  </div>
+  <div class="hold-hint" id="hold-hint"></div>
+  <div class="hold-ring" id="hold-ring"></div>
   <div class="rprogress" id="rprogress" hidden><i id="rbar"></i></div>
   <div class="pausebar" id="pausebar" hidden>
     <button type="button" class="btn primary" id="btn-resume"><svg class="ic"><use href="#i-play"/></svg>RESUME</button>
@@ -312,6 +343,7 @@ select{background:#000;border:2px solid var(--line);border-radius:var(--r);min-h
         <option value="none">Off</option>
       </select>
     </label>
+    <label class="row" for="opt-fade"><span>Soft start (fade in)</span><input type="checkbox" id="opt-fade"></label>
     <button type="button" class="btn" id="test-sound"><svg class="ic"><use href="#i-play"/></svg>TEST</button>
     <label class="row" for="opt-volume"><span>Volume</span><input type="range" id="opt-volume" min="0" max="1" step="0.05"></label>
   </section>
@@ -326,7 +358,41 @@ select{background:#000;border:2px solid var(--line);border-radius:var(--r);min-h
   </section>
 
   <section class="grp">
+    <h3><svg class="ic"><use href="#i-hourglass"/></svg>ENDING</h3>
+    <div class="sub">Gentle notice before end</div>
+    <div class="chips four" role="radiogroup" aria-label="Notice before end">
+      <label class="chip"><input type="radio" class="sr" name="warn" value="0"><span class="face">Off</span></label>
+      <label class="chip"><input type="radio" class="sr" name="warn" value="30"><span class="face">30s</span></label>
+      <label class="chip"><input type="radio" class="sr" name="warn" value="60"><span class="face">1m</span></label>
+      <label class="chip"><input type="radio" class="sr" name="warn" value="180"><span class="face">3m</span></label>
+    </div>
+    <div class="sub">At 0:00</div>
+    <div class="chips two" role="radiogroup" aria-label="Effect at zero">
+      <label class="chip"><input type="radio" class="sr" name="endfx" value="pulse"><span class="face">Blink + zoom</span></label>
+      <label class="chip"><input type="radio" class="sr" name="endfx" value="calm"><span class="face">Calm fade</span></label>
+    </div>
+    <label class="row" for="opt-over"><span>Count up after 0:00</span><input type="checkbox" id="opt-over"></label>
+  </section>
+
+  <section class="grp">
+    <h3><svg class="ic"><use href="#i-key"/></svg>TOUCH</h3>
+    <label class="row" for="opt-lock"><span>Touch lock (hold to pause)</span><input type="checkbox" id="opt-lock"></label>
+    <p class="note">Short taps on the running screen are ignored. Hold about 1 second to pause or return.</p>
+  </section>
+
+  <section class="grp">
     <h3><svg class="ic"><use href="#i-screen"/></svg>DISPLAY</h3>
+    <div class="sub">View (timer)</div>
+    <div class="chips three" role="radiogroup" aria-label="View">
+      <label class="chip"><input type="radio" class="sr" name="view" value="digits"><span class="face">12:34</span></label>
+      <label class="chip"><input type="radio" class="sr" name="view" value="pie"><span class="face">◔</span></label>
+      <label class="chip"><input type="radio" class="sr" name="view" value="both"><span class="face">◔ 12:34</span></label>
+    </div>
+    <div class="sub">Pie color</div>
+    <div class="chips two" role="radiogroup" aria-label="Pie color">
+      <label class="chip"><input type="radio" class="sr" name="pie" value="red"><span class="face">Red</span></label>
+      <label class="chip"><input type="radio" class="sr" name="pie" value="white"><span class="face">White</span></label>
+    </div>
     <label class="row" for="opt-full"><span>Full screen on start</span><input type="checkbox" id="opt-full"></label>
     <label class="row" for="opt-bar"><span>Progress bar</span><input type="checkbox" id="opt-bar"></label>
     <label class="row" for="opt-wake"><span>Keep screen on</span><input type="checkbox" id="opt-wake"></label>
@@ -418,7 +484,7 @@ const pad = n => String(n).padStart(2, '0');
 /* ---------- settings ---------- */
 const KEY = 'classroom-timer-v1';
 const GUIDE_KEY = 'classroom-timer-guide-seen';
-const DEF = {speakOn:false, voice:'', rate:1, thresholds:[300,180,60,30,10], endSpeak:true, sound:'bell', volume:0.8, wake:true, full:true, bar:true, clock24:true, clockSec:true};
+const DEF = {speakOn:false, voice:'', rate:1, thresholds:[300,180,60,30,10], endSpeak:true, sound:'bell', volume:0.8, wake:true, full:true, bar:true, clock24:true, clockSec:true, viewMode:'both', pieColor:'red', warn:60, endFx:'pulse', over:true, lock:false, fade:true};
 let S = Object.assign({}, DEF);
 try {
   const raw = localStorage.getItem(KEY);
@@ -493,6 +559,9 @@ Seg.prototype.build = function(sig){
     } else if (ch === ':') {
       html += '<rect class="dot" x="' + x + '" y="' + COLON[0] + '" width="' + TH + '" height="' + TH + '"/><rect class="dot" x="' + x + '" y="' + COLON[1] + '" width="' + TH + '" height="' + TH + '"/>';
       x += TH + DG; lastAdv = DG;
+    } else if (ch === '-') {
+      html += '<rect class="dot" x="' + x + '" y="' + (SH / 2 - hh) + '" width="30" height="' + TH + '"/>';
+      x += 30 + DG; lastAdv = DG;
     } else if (ch === '|') {
       const z = 0.5, oy = SH - SH * z;
       COLON.forEach(cy => { html += '<rect class="dot" x="' + x + '" y="' + (oy + cy * z) + '" width="' + TH * z + '" height="' + TH * z + '"/>'; });
@@ -555,7 +624,8 @@ function playAlarm(kind){
   const ctx = audio();
   if (!ctx) return 0;
   const bus = ctx.createGain();
-  bus.gain.value = S.volume;
+  if (S.fade) { bus.gain.setValueAtTime(0.0001, ctx.currentTime); bus.gain.linearRampToValueAtTime(S.volume, ctx.currentTime + 2.5); }
+  else bus.gain.value = S.volume;
   bus.connect(ctx.destination);
   alarmBus = bus;
   const t0 = ctx.currentTime + 0.05;
@@ -661,7 +731,7 @@ function clearTimer(){
   T.state = 'idle'; T.remain = 0; T.total = 0; T.armed.clear();
 }
 function finishTimer(){
-  T.state = 'finished'; T.remain = 0; T.armed.clear();
+  T.state = 'finished'; T.remain = 0; T.armed.clear(); T.finishedAt = now();
   startAlarm();
   if (S.speakOn && S.endSpeak) setTimeout(() => { if (T.state === 'finished') speak('時間です。'); }, S.sound === 'none' ? 0 : 900);
   paintRun();
@@ -717,6 +787,11 @@ function paintRun(){
   run.classList.toggle('done', st === 'finished');
   $('#pausebar').hidden = st !== 'paused';
   $('#rprogress').hidden = !(S.bar && mode === 'timer');
+  if (mode !== 'timer') run.classList.remove('pulse', 'calm', 'warn');
+  const vm = mode === 'timer' ? S.viewMode : 'digits';
+  $('#rpie').hidden = vm === 'digits';
+  $('#rdigits').hidden = vm === 'pie';
+  document.documentElement.style.setProperty('--pie', S.pieColor === 'white' ? '#e6e6e6' : '#e0463c');
   if (st === 'paused') $('#btn-resume').focus({preventScroll:true});
 }
 function paintSetup(){
@@ -784,6 +859,29 @@ function setSpeak(on){
   if (!on && hasSpeech) { try { speechSynthesis.cancel(); } catch (e) {} }
 }
 
+/* ---------- pie ---------- */
+(function(){
+  let h = '';
+  for (let i = 0; i < 12; i++) {
+    const a = i * Math.PI / 6, r1 = i % 3 ? 90 : 84;
+    h += '<line class="pie-tick" x1="' + (100 + r1 * Math.sin(a)).toFixed(1) + '" y1="' + (100 - r1 * Math.cos(a)).toFixed(1) + '" x2="' + (100 + 95 * Math.sin(a)).toFixed(1) + '" y2="' + (100 - 95 * Math.cos(a)).toFixed(1) + '"/>';
+  }
+  $('#pie-ticks').innerHTML = h;
+})();
+let lastPie = -1;
+function drawPie(f){
+  const q = Math.round(f * 2000) / 2000;
+  if (q === lastPie) return;
+  lastPie = q;
+  const full = $('#pie-full'), path = $('#pie-path');
+  if (q >= 0.9995) { full.hidden = false; path.setAttribute('d', ''); return; }
+  full.hidden = true;
+  if (q <= 0) { path.setAttribute('d', ''); return; }
+  const a = q * 2 * Math.PI, R = 88;
+  const x = 100 + R * Math.sin(a), y = 100 - R * Math.cos(a);
+  path.setAttribute('d', 'M100 100 L100 ' + (100 - R) + ' A' + R + ' ' + R + ' 0 ' + (q > 0.5 ? 1 : 0) + ' 1 ' + x.toFixed(2) + ' ' + y.toFixed(2) + ' Z');
+}
+
 let lastPct = -1;
 function render(t){
   const tt = t === undefined ? now() : t;
@@ -792,6 +890,17 @@ function render(t){
     const r = timerRemain(tt);
     str = fmtTimer(r);
     pct = T.total > 0 ? Math.min(1, r / T.total) : 0;
+    if (view === 'run') {
+      const run = $('#run');
+      const fin = T.state === 'finished';
+      const since = fin ? tt - T.finishedAt : 0;
+      if (fin && S.over && since >= 1000) str = '-' + fmtMain(Math.floor(since / 1000));
+      run.classList.toggle('pulse', fin && S.endFx !== 'calm' && !(S.over && since > 6000));
+      run.classList.toggle('calm', fin && S.endFx === 'calm');
+      const ws = S.warn * 1000;
+      run.classList.toggle('warn', T.state === 'running' && ws > 0 && r <= ws && T.total > ws);
+      drawPie(fin ? 0 : pct);
+    }
   } else if (mode === 'sw') {
     str = fmtSw(swElapsed(tt));
   } else {
@@ -889,6 +998,19 @@ function initSettings(){
   $('#opt-24').checked = !!S.clock24; $('#opt-12').checked = !S.clock24;
   $$('input[name=clockfmt]').forEach(r => r.addEventListener('change', () => { S.clock24 = $('#opt-24').checked; save(); }));
   bind('#opt-sec', 'clockSec', 'change', el => el.checked);
+  const radio = (name, key, parse) => {
+    $$('input[name=' + name + ']').forEach(r => {
+      r.checked = String(S[key]) === r.value;
+      r.addEventListener('change', () => { if (r.checked) { S[key] = parse(r.value); save(); } });
+    });
+  };
+  radio('view', 'viewMode', v => v);
+  radio('pie', 'pieColor', v => v);
+  radio('warn', 'warn', v => +v);
+  radio('endfx', 'endFx', v => v);
+  bind('#opt-over', 'over', 'change', el => el.checked);
+  bind('#opt-lock', 'lock', 'change', el => el.checked);
+  bind('#opt-fade', 'fade', 'change', el => el.checked);
   bind('#opt-full', 'full', 'change', el => el.checked);
   bind('#opt-bar', 'bar', 'change', el => el.checked);
   bind('#opt-wake', 'wake', 'change', el => el.checked, syncWake);
@@ -982,7 +1104,38 @@ $('#tab-sw').addEventListener('click', () => setMode('sw'));
 $('#tab-clock').addEventListener('click', () => setMode('clock'));
 $('#btn-start').addEventListener('click', start);
 $('#btn-clear').addEventListener('click', clearMain);
-$('#run').addEventListener('click', e => { if (!e.target.closest('.pausebar')) runTap(); });
+const HOLD = 800;
+let holdT = 0, holdFired = false, hintT = 0;
+function holdWord(){
+  const st = curState();
+  return st === 'running' ? 'HOLD TO PAUSE' : st === 'paused' ? 'HOLD TO RESUME' : 'HOLD TO RETURN';
+}
+function showHint(){
+  const h = $('#hold-hint');
+  h.textContent = holdWord(); h.classList.add('show');
+  clearTimeout(hintT); hintT = setTimeout(() => h.classList.remove('show'), 1600);
+}
+function cancelHold(){
+  clearTimeout(holdT); holdT = 0;
+  $('#hold-ring').classList.remove('on');
+}
+$('#run').addEventListener('pointerdown', e => {
+  if (!S.lock || e.target.closest('.pausebar')) return;
+  holdFired = false;
+  const ring = $('#hold-ring');
+  ring.style.left = e.clientX + 'px'; ring.style.top = e.clientY + 'px';
+  ring.style.setProperty('--hold', HOLD + 'ms');
+  ring.classList.remove('on'); void ring.offsetWidth; ring.classList.add('on');
+  clearTimeout(holdT);
+  holdT = setTimeout(() => { holdFired = true; cancelHold(); runTap(); }, HOLD);
+});
+['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => $('#run').addEventListener(ev, cancelHold));
+$('#run').addEventListener('contextmenu', e => { if (S.lock) e.preventDefault(); });
+$('#run').addEventListener('click', e => {
+  if (e.target.closest('.pausebar')) return;
+  if (S.lock) { if (!holdFired) showHint(); holdFired = false; return; }
+  runTap();
+});
 $('#btn-resume').addEventListener('click', runTap);
 $('#btn-back').addEventListener('click', backToSetup);
 $('#btn-speak').addEventListener('click', () => setSpeak(!S.speakOn));
